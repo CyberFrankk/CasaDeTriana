@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probador de outfits · Prueba</title>
+<style>
+  body{ font-family:Arial, sans-serif; background:#1a1a1a; color:#eee; padding:24px; text-align:center; }
+  h1{ font-size:20px; }
+  .limite{ display:inline-block; background:#333; padding:6px 14px; border-radius:20px; font-size:13px; margin-bottom:16px; }
+  .limite.bajo{ background:#5a3b1a; color:#ffd18a; }
+  .limite.agotado{ background:#5a1a1a; color:#ff9a9a; }
+  .row{ display:flex; gap:20px; justify-content:center; flex-wrap:wrap; margin-top:10px; }
+  .card{ background:#2a2a2a; padding:16px; border-radius:12px; width:280px; }
+  img{ width:100%; border-radius:8px; background:#000; min-height:180px; object-fit:contain; }
+  input[type=file]{ width:100%; margin-top:10px; color:#eee; }
+  button{ margin-top:14px; padding:10px 20px; border-radius:8px; border:none; background:#e8a33d; font-weight:bold; cursor:pointer; font-size:14px; }
+  button:disabled{ background:#555; cursor:not-allowed; }
+  .estado{ margin-top:10px; font-size:13px; opacity:.85; }
+  .alerta{ background:#5a1a1a; border:1px solid #ff6b6b; padding:12px; border-radius:10px; max-width:420px; margin:16px auto; font-size:14px; }
+</style>
+</head>
+<body>
+  <h1>👗 Probador de outfits (prueba)</h1>
+  <div id="limiteBadge" class="limite">Cargando límite...</div>
+
+  <div id="alertaLimite" class="alerta" style="display:none">
+    Ya generaste tus <b id="limNum">10</b> outfits de hoy. Vuelve mañana para generar más 💛
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <p><b>1. Tu personaje</b></p>
+      <img id="prevChar" src="" alt="Personaje">
+      <input type="file" id="fileChar" accept="image/*">
+    </div>
+    <div class="card">
+      <p><b>2. Foto de la prenda</b></p>
+      <img id="prevGarment" src="" alt="Prenda">
+      <input type="file" id="fileGarment" accept="image/*">
+    </div>
+    <div class="card">
+      <p><b>Resultado</b></p>
+      <img id="resultado" src="" alt="Resultado">
+      <button id="btnGenerar" onclick="generar()">Generar prueba de outfit</button>
+      <div class="estado" id="estado"></div>
+    </div>
+  </div>
+
+<script>
+const fileChar = document.getElementById('fileChar');
+const fileGarment = document.getElementById('fileGarment');
+const prevChar = document.getElementById('prevChar');
+const prevGarment = document.getElementById('prevGarment');
+const resultado = document.getElementById('resultado');
+const estado = document.getElementById('estado');
+const btnGenerar = document.getElementById('btnGenerar');
+const limiteBadge = document.getElementById('limiteBadge');
+const alertaLimite = document.getElementById('alertaLimite');
+
+let charB64 = null, garmentB64 = null;
+
+fileChar.addEventListener('change', e => leerArchivo(e.target.files[0], (b64) => { charB64 = b64; prevChar.src = 'data:image/png;base64,' + b64; }));
+fileGarment.addEventListener('change', e => leerArchivo(e.target.files[0], (b64) => { garmentB64 = b64; prevGarment.src = 'data:image/png;base64,' + b64; }));
+
+function leerArchivo(file, cb){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => cb(reader.result.split(',')[1]);
+  reader.readAsDataURL(file);
+}
+
+async function generar(){
+  if(!charB64 || !garmentB64){
+    estado.textContent = 'Sube las dos imágenes primero';
+    return;
+  }
+  btnGenerar.disabled = true;
+  estado.textContent = 'Generando... puede tardar unos segundos';
+  resultado.src = '';
+
+  try{
+    const res = await fetch('/api/generate-outfit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ characterImage: charB64, garmentImage: garmentB64 })
+    });
+    const data = await res.json();
+
+    if(res.status === 429){
+      mostrarLimiteAgotado(data);
+      return;
+    }
+    if(!res.ok){
+      estado.textContent = '❌ ' + (data.message || 'Error generando la imagen');
+      return;
+    }
+
+    resultado.src = 'data:image/png;base64,' + data.image;
+    estado.textContent = '✅ Listo';
+    actualizarBadge(data.remaining, data.limit);
+  }catch(e){
+    estado.textContent = '❌ Error de red';
+  }finally{
+    btnGenerar.disabled = false;
+  }
+}
+
+function mostrarLimiteAgotado(data){
+  estado.textContent = '';
+  alertaLimite.style.display = 'block';
+  document.getElementById('limNum').textContent = data.limit ?? 10;
+  actualizarBadge(0, data.limit ?? 10);
+  btnGenerar.disabled = true;
+}
+
+function actualizarBadge(remaining, limit){
+  limiteBadge.textContent = `${remaining} de ${limit} generaciones restantes hoy`;
+  limiteBadge.className = 'limite' + (remaining === 0 ? ' agotado' : remaining <= 2 ? ' bajo' : '');
+}
+
+// Al cargar, solo mostramos el estado por defecto (el conteo real se confirma con la primera generación)
+actualizarBadge(10, 10);
+</script>
+</body>
+</html>
