@@ -76,7 +76,7 @@ const alertaLimite = document.getElementById('alertaLimite');
 let charB64 = null, topB64 = null, bottomB64 = null;
 let pollTimer = null;
 let pollAttempts = 0;
-const MAX_POLL_ATTEMPTS = 90; // 90 * 4s = 6 minutos máximo
+const MAX_POLL_ATTEMPTS = 150; // 150 * 4s = 10 minutos máximo
 
 fileChar.addEventListener('change', e => leerArchivo(e.target.files[0], (b64, dataUrl) => { charB64 = b64; prevChar.src = dataUrl; }));
 fileTop.addEventListener('change', e => leerArchivo(e.target.files[0], (b64, dataUrl) => { topB64 = b64; prevTop.src = dataUrl; }));
@@ -178,7 +178,7 @@ async function consultarEstado(jobId){
 
     if(data.status === 'done'){
       resultado.src = 'data:image/png;base64,' + data.image;
-      setEstado('✅ Listo');
+      setEstado(data.bgRemoved === false ? '✅ Listo (el fondo no se pudo quitar esta vez)' : '✅ Listo');
       actualizarBadge(data.remaining, data.limit);
     }
   }catch(e){
