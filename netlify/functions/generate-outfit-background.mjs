@@ -46,11 +46,22 @@ export default async (req) => {
     const clientOpts = hfToken ? { hf_token: hfToken } : undefined;
 
     await setJob(jobStore, jobId, { status: 'processing', step: 'Poniendo la prenda de arriba...' });
-    let current = await runTryOn(characterImage, topImage, topDesc || 'prenda superior', clientOpts);
+    let current = await withTimeout(
+      runTryOn(characterImage, topImage, topDesc || 'prenda superior', clientOpts),
+      240000, 'TOP_TIMEOUT'
+    );
 
+    let bottomApplied = true;
     if (bottomImage) {
       await setJob(jobStore, jobId, { status: 'processing', step: 'Poniendo la prenda de abajo...' });
-      current = await runTryOn(current, bottomImage, bottomDesc || 'prenda inferior', clientOpts);
+      try {
+        current = await withTimeout(
+          runTryOn(current, bottomImage, bottomDesc || 'prenda inferior', clientOpts),
+          240000, 'BOTTOM_TIMEOUT'
+        );
+      } catch (e) {
+        bottomApplied = false;
+      }
     }
 
     await setJob(jobStore, jobId, { status: 'processing', step: 'Quitando el fondo...' });
@@ -72,6 +83,7 @@ export default async (req) => {
       status: 'done',
       image: finalImage,
       bgRemoved,
+      bottomApplied,
       remaining: DAILY_LIMIT - newCount,
       limit: DAILY_LIMIT
     });
