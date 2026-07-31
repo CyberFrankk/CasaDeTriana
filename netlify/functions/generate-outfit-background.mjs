@@ -54,7 +54,16 @@ export default async (req) => {
     }
 
     await setJob(jobStore, jobId, { status: 'processing', step: 'Quitando el fondo...' });
-    const finalImage = await removeBackground(current, clientOpts);
+    let finalImage = current;
+    let bgRemoved = true;
+    try {
+      finalImage = await withTimeout(removeBackground(current, clientOpts), 90000, 'RMBG_TIMEOUT');
+    } catch (e) {
+      // Si quitar el fondo falla o se cuelga, no perdemos todo el trabajo:
+      // entregamos el resultado vestido tal cual, con fondo.
+      finalImage = current;
+      bgRemoved = false;
+    }
 
     const newCount = count + 1;
     try { await limitStore.set(limitKey, String(newCount)); } catch (e) { /* ignore */ }
@@ -62,6 +71,7 @@ export default async (req) => {
     await setJob(jobStore, jobId, {
       status: 'done',
       image: finalImage,
+      bgRemoved,
       remaining: DAILY_LIMIT - newCount,
       limit: DAILY_LIMIT
     });
@@ -70,6 +80,13 @@ export default async (req) => {
     await setJob(jobStore, jobId, { status: 'error', message: e?.message || 'Error generando el outfit' });
   }
 };
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(label || 'TIMEOUT')), ms))
+  ]);
+}
 
 async function setJob(store, jobId, data) {
   try { await store.set(jobId, JSON.stringify(data)); } catch (e) { /* ignore */ }
