@@ -78,8 +78,8 @@ async function setJob(store, jobId, data) {
 // ===== Llama a IDM-VTON: pone `garmentB64` sobre `personB64` =====
 async function runTryOn(personB64, garmentB64, description, clientOpts) {
   const client = await Client.connect(VTON_SPACE, clientOpts);
-  const personBlob = base64ToBlob(personB64, 'image/png');
-  const garmentBlob = base64ToBlob(garmentB64, 'image/png');
+  const personBlob = base64ToBlob(personB64, 'image/jpeg');
+  const garmentBlob = base64ToBlob(garmentB64, 'image/jpeg');
 
   const result = await client.predict('/tryon', {
     dict: { background: personBlob, layers: [], composite: null },
